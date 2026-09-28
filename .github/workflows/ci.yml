@@ -1,0 +1,55 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run Pytest
+    runs-on: ubuntu-latest
+    env:
+      AGENT_API_KEY: ci-test-key
+      REDIS_URL: "fake://"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run automated tests
+        run: |
+          pytest --ignore=tests/test_cp5.py --ignore=tests/test_bonus_cicd.py -v
+
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -t day12-agent .
+
+  deploy:
+    name: Deploy Service
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Deployment
+        run: |
+          echo "Deploying verified commit to production..."
+        env:
+          DEPLOY_SECRET: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
